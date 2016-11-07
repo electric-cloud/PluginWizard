@@ -1,0 +1,11 @@
+<plugin>
+  <author>Electric Cloud</author>
+  <authorUrl></authorUrl>
+  <category>Utilities</category>
+  <commander-version min="6.0" />
+  <description></description>
+  <help>help.xml</help>
+  <key>MyPlugin</key>
+  <label>MyPlugin</label>
+  <version>1.0.0</version>
+</plugin>

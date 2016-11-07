@@ -1,0 +1,95 @@
+<exportedData buildLabel="build_3.5_30434_OPT_2010.01.13_07:32:22" buildVersion="3.5.1.30434" version="39">
+  <exportPath>/projects/MyPlugin-1.0</exportPath>
+  <project>
+    <projectName>MyPlugin-1.0</projectName>
+    <propertySheet>
+      <property>
+        <expandable>0</expandable>
+        <propertyName>ec_setup</propertyName>
+        <value>use Cwd;
+
+use File::Spec;
+use ElectricCommander::ArtifactManagement;
+use ElectricCommander::ArtifactManagement::ArtifactVersion;
+
+use POSIX;
+
+my $dir = getcwd;
+
+my $logfile =&quot;&quot;;
+
+my $pluginDir;
+
+if(defined $ENV{QUERY_STRING}) { # Promotion through UI
+
+       $pluginDir = $ENV{COMMANDER_PLUGINS} . &quot;/$pluginName&quot;;
+
+
+
+} else {
+
+       $pluginDir = $dir;
+
+}
+
+
+
+$commander-&gt;setProperty(&quot;/plugins/$pluginName/project/pluginDir&quot;,{value=&gt;$pluginDir});
+
+$logfile .= &quot;Plugin Name: $pluginName\n&quot;;
+
+$logfile .= &quot;Plugin Directory: $pluginDir\n&quot;;
+
+
+
+# Evaluate promote.groovy or demote.groovy based on whether plugin is being promoted or demoted ($promoteAction)
+
+local $/ = undef;
+
+# If env variable QUERY_STRING exists:
+
+if(defined $ENV{QUERY_STRING}) { # Promotion through UI
+
+       open FILE, $ENV{COMMANDER_PLUGINS} . &quot;/$pluginName/dsl/$promoteAction.groovy&quot; or die &quot;Couldn't open file: $!&quot;;
+
+} else {  # Promotion from the command line
+
+       open FILE, &quot;dsl/$promoteAction.groovy&quot; or die &quot;Couldn't open file: $!&quot;;
+
+}
+
+my $dsl = &lt;FILE&gt;;
+
+close FILE;
+
+my $dslReponse = $commander-&gt;evalDsl($dsl,
+
+              {parameters=&gt;qq(
+
+                     {
+
+                           &quot;pluginName&quot;:&quot;$pluginName&quot;,
+                           &quot;upgradeAction&quot;:&quot;$upgradeAction&quot;,
+                           &quot;otherPluginName&quot;:&quot;$otherPluginName&quot;
+
+                     }
+
+              ),
+              debug=&gt;&quot;false&quot;,
+			  serverLibraryPath=&gt;&quot;$pluginDir/dsl&quot;}
+
+);
+
+$logfile .= $dslReponse-&gt;findnodes_as_string(&quot;/&quot;);
+
+my $errorMessage = $commander-&gt;getError();
+
+my $nowString = localtime;
+
+$commander-&gt;setProperty(&quot;/plugins/$pluginName/project/logs/$nowString&quot;,{value=&gt;$logfile});
+
+</value>
+      </property>
+    </propertySheet>
+  </project>
+</exportedData>
