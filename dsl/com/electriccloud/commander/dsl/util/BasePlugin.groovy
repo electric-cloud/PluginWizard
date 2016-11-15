@@ -178,6 +178,13 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
+	def upgrade(String upgradeAction, String pluginName,
+								String otherPluginName, Map steps,
+								String configName = 'ec_plugin_cfgs') {
+
+		migrationConfigurations(upgradeAction, pluginName, otherPluginName, steps, configName)
+	}
+
 	def migrationConfigurations(String upgradeAction, String pluginName,
 								String otherPluginName, Map steps,
 								String configName = 'ec_plugin_cfgs') {
