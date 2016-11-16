@@ -83,26 +83,33 @@ abstract class BasePlugin extends DslDelegatingScript {
 		return !(standardStepPicker == 'false' || standardStepPicker == '0')
 	}
 
-	def loadPluginProperties(String pluginDir) {
+	def loadPluginProperties(String pluginDir, String pluginName) {
 
 		// Recursively navigate each file or sub-directory in the properties directory
 		//Create a property corresponding to a file,
 		// or create a property sheet for a sub-directory before navigating into it
-		loadNestedProperties(new File(pluginDir, 'dsl/properties'))
+		loadNestedProperties("/projects/$pluginName", new File(pluginDir, 'dsl/properties'))
 	}
 
-	def loadNestedProperties(File propsDir) {
+	def loadNestedProperties(String propRoot, File propsDir) {
 
 		propsDir.eachFile { dir ->
 			int extension = dir.name.lastIndexOf('.')
 			int endIndex = extension > -1 ? extension : dir.name.length()
 			String propName = dir.name.substring(0, endIndex)
+			String propPath = "${propRoot}/${propName}"
 			if (dir.directory) {
 				property propName, {
-					loadNestedProperties(dir)
+					loadNestedProperties(propPath, dir)
 				}
 			} else {
-				property propertyName: propName, value: dir.text
+				def exists = getProperty(propPath, suppressNoSuchPropertyException: true, expand: false)
+				if (exists) {
+					modifyProperty propertyName: propPath, value: dir.text
+				} else {
+					createProperty propertyName: propPath, value: dir.text
+				}
+
 			}
 		}
 	}
@@ -179,27 +186,31 @@ abstract class BasePlugin extends DslDelegatingScript {
 	}
 
 	def upgrade(String upgradeAction, String pluginName,
-								String otherPluginName, Map steps,
+								String otherPluginName, List steps,
 								String configName = 'ec_plugin_cfgs') {
 
 		migrationConfigurations(upgradeAction, pluginName, otherPluginName, steps, configName)
 	}
 
 	def migrationConfigurations(String upgradeAction, String pluginName,
-								String otherPluginName, Map steps,
+								String otherPluginName, List steps,
 								String configName = 'ec_plugin_cfgs') {
 
 		if (upgradeAction == 'upgrade') {
 
 			//Copy configurations from otherPluginName
 			def configs = getProperty("/plugins/$otherPluginName/project/$configName", suppressNoSuchPropertyException: true)
-			def credentials = getCredentials("/plugins/$otherPluginName")
+			// bail if the other plugin does not have any configurations - nothing to do
+			if (!configs) return
 
-			if (configs) {
-				clone path: "/plugins/$otherPluginName/project/$configName",
-						cloneName: "/plugins/$pluginName/project/$configName"
-			}
+			//bail if the new plugin already has configurations
+			def existingConfigs = getProperty("/plugins/$pluginName/project/$configName", suppressNoSuchPropertyException: true)
+			if (existingConfigs) return
 
+			clone path: "/plugins/$otherPluginName/project/$configName",
+					cloneName: "/plugins/$pluginName/project/$configName"
+
+			def credentials = getCredentials("/plugins/$otherPluginName/project")
 			if (credentials) {
 				credentials.each { cred ->
 					clone path: "/plugins/$otherPluginName/project/credentials/${cred.credentialName}",

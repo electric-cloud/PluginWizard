@@ -17,7 +17,7 @@ project pluginName, {
 	
 	ec_visibility = 'pickListOnly'
 
-	loadPluginProperties(pluginDir)
+	loadPluginProperties(pluginDir, pluginName)
 	loadProcedures(pluginDir, pluginKey, pluginName, pluginCategory)
 
 }
@@ -41,7 +41,7 @@ objTypes.each { type ->
 // the credentials to the required plugin procedure steps.
 upgrade(upgradeAction, pluginName, otherPluginName,
 		/*TODO: Add the list of procedure steps to which the plugin configuration credentials need to be attached.*/
-		[/*{
-			procedureName: 'Procedure Name'
+		[/*[
+			procedureName: 'Procedure Name',
 			stepName: 'step that needs the credentials to be attached'
-		 },*/])
+		 ],*/])
