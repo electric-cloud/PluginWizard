@@ -1,0 +1,12 @@
+import java.io.File
+
+procedure 'PROCEDURE NAME HERE', {
+
+	step 'step1',
+    	  command: new File(pluginDir, 'dsl/procedures/PROCEDURE DIRECTORY HERE/steps/step1.pl').text,
+    	  shell: 'ec-perl',
+
+	// add more steps here
+	  
+}
+  
