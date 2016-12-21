@@ -22,20 +22,6 @@ project pluginName, {
 
 }
 
-//Grant permissions to the plugin project
-def objTypes = ['resources', 'workspaces', 'projects'];
-
-objTypes.each { type ->
-		aclEntry principalType: 'user', 
-			 principalName: "project: $pluginName",
-			 systemObjectName: type,
-             objectType: 'systemObject',
-			 readPrivilege: 'allow', 
-			 modifyPrivilege: 'allow',
-			 executePrivilege: 'allow',
-			 changePermissionsPrivilege: 'allow'
-}
-
 // Copy existing plugin configurations from the previous
 // version to this version. At the same time, also attach
 // the credentials to the required plugin procedure steps.
