@@ -28,24 +28,6 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 	def setupCustomEditorData(String pluginKey, String pluginName, String pluginCategory) {
 		getProcedures(pluginName).each { proc ->
-			procedure proc.procedureName, {
-				getFormalParameters(pluginName, procedureName: proc.procedureName).each { param ->
-					property 'ec_customEditorData', procedureName: proc.procedureName, {
-
-						property 'parameters', {
-
-							property param.formalParameterName, {
-								formType = 'standard'
-								if ('checkbox'.equals(param.type)) {
-									checkedValue = 'true'
-									initiallyChecked = '0'
-									uncheckedValue = 'false'
-								}
-							}
-						}
-					}
-				}
-			}
 
 			def addStepPicker = shouldAddStepPicker(pluginName, proc.procedureName)
 			println "/projects/${pluginName}/procedures/${proc.procedureName}/standardStepPicker: '$addStepPicker'"
@@ -79,8 +61,11 @@ abstract class BasePlugin extends DslDelegatingScript {
 		if (procedureName == 'CreateConfiguration' || procedureName == 'DeleteConfiguration') {
 			return false
 		}
-		def standardStepPicker = getProperty("/projects/${pluginName}/procedures/${procedureName}/standardStepPicker", suppressNoSuchPropertyException: true)
-		return !(standardStepPicker == 'false' || standardStepPicker == '0')
+		def prop = getProperty("/projects/${pluginName}/procedures/${procedureName}/standardStepPicker", suppressNoSuchPropertyException: true)
+		def value = prop?.value
+		// If the property is not set, then we add the step-picker by default
+		// If the property is set, then we check if the user requested stepPicker not be added.
+		return value == null || (value != 'false' && value != '0')
 	}
 
 	def loadPluginProperties(String pluginDir, String pluginName) {
@@ -163,25 +148,42 @@ abstract class BasePlugin extends DslDelegatingScript {
 		
 		procedure proc.procedureName, {
 				
-				ec_parameterForm = formXml.text
-				//TODO: Update help link in form.xml 
-				formElements.formElement.each {
-						formalParameter it.property, 
-							defaultValue: it.value,
-							required: it.required,
-							description: it.description,
-							type: it.type,
-							label: it.label
+			ec_parameterForm = formXml.text
+			//TODO: Update help link in form.xml
+			formElements.formElement.each { formElement ->
+				formalParameter formElement.property,
+					defaultValue: formElement.value,
+					required: formElement.required,
+					description: formElement.description,
+					type: formElement.type,
+					label: formElement.label
 
-						if (it['attachedAsParameterToStep'] && it['attachedAsParameterToStep'] != '') {
+				if (formElement['attachedAsParameterToStep'] && formElement['attachedAsParameterToStep'] != '') {
+					formElement['attachedAsParameterToStep'].toString().split(',').each { attachToStep ->
+						println("Attaching parameter $formElement.property to step $attachToStep")
+						attachParameter(projectName: proc.projectName,
+								procedureName: proc.procedureName,
+								stepName: attachToStep,
+								formalParameterName: formElement.property)
+					}
+				}
 
-								attachParameter(projectName: proc.projectName,
-										procedureName: proc.procedureName,
-										stepName: it['attachedAsParameterToStep'],
-										formalParameterName: it.property)
+				//setup custom editor data for each parameter
+				property 'ec_customEditorData', procedureName: proc.procedureName, {
+					property 'parameters', {
+                       property formElement.property, {
+							formType = 'standard'
+						    println "Form element $formElement.property, type: '${formElement.type.toString()}'"
+							if ('checkbox' == formElement.type.toString()) {
+								checkedValue = formElement.checkedValue?:'true'
+								uncheckedValue = formElement.uncheckedValue?:'false'
+								initiallyChecked = formElement.initiallyChecked?:'0'
+							}
 						}
+					}
+				}
 
-				}	
+			}
 		}
 	}
 
