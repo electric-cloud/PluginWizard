@@ -53,6 +53,10 @@ my $dslReponse = $commander->evalDsl(
 
 $logfile .= $dslReponse->findnodes_as_string("/");
 
-# Create output property
+my $errorMessage = $commander->getError();
+
+# Create output property for plugin setup debug logs
 my $nowString = localtime;
 $commander->setProperty( "/plugins/$pluginName/project/logs/$nowString", { value => $logfile } );
+
+die $errorMessage unless !$errorMessage
