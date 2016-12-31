@@ -12,7 +12,6 @@ def otherPluginName = args.otherPluginName
 def pluginKey = getProject("/plugins/$pluginName/project").pluginKey
 def pluginDir = getProperty("/projects/$pluginName/pluginDir").value
 
-def pluginCategory = 'Utilities'
 //List of procedure steps to which the plugin configuration credentials need to be attached
 def stepsWithAttachedCredentials = [
 		/*[
@@ -20,12 +19,13 @@ def stepsWithAttachedCredentials = [
 			stepName: 'step that needs the credentials to be attached'
 		 ],*/
 	]
+	
 project pluginName, {
 	
 	ec_visibility = 'pickListOnly'
 
 	loadPluginProperties(pluginDir, pluginName)
-	loadProcedures(pluginDir, pluginKey, pluginName, pluginCategory, stepsWithAttachedCredentials)
+	loadProcedures(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	//plugin configuration metadata
 	property 'ec_config', {
 		form = '$[' + "/projects/${pluginName}/procedures/CreateConfiguration/ec_parameterForm]"

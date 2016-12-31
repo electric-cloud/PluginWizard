@@ -27,7 +27,8 @@ abstract class BasePlugin extends DslDelegatingScript {
 			description: propDescription
 	} 
 
-	def setupPluginMetadata(String pluginKey, String pluginName, String pluginCategory, List stepsWithAttachedCredentials) {
+	def setupPluginMetadata(String pluginDir, String pluginKey, String pluginName, List stepsWithAttachedCredentials) {
+	    String pluginCategory = determinePluginCategory(pluginDir)
 		getProcedures(pluginName).each { proc ->
 
 			def addStepPicker = shouldAddStepPicker(pluginName, proc.procedureName)
@@ -46,7 +47,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 	
-	def cleanup(String pluginKey, String pluginName, String pluginCategory) {
+	def cleanup(String pluginKey, String pluginName) {
 		getProcedures(pluginName).each { proc ->
 			
 			def addStepPicker = shouldAddStepPicker(pluginName, proc.procedureName)
@@ -63,6 +64,12 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
+	def determinePluginCategory(String pluginDir) {
+		File pluginXml = new File("$pluginDir/META-INF", 'plugin.xml')
+		def pluginRoot = new XmlSlurper().parseText(pluginXml.text)
+		pluginRoot.category?: 'Utilities'
+	}
+	
 	def shouldAddStepPicker(def pluginName, def procedureName) {
 		if (procedureName == 'CreateConfiguration' || procedureName == 'DeleteConfiguration') {
 			return false
@@ -105,7 +112,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
-	def loadProcedures(String pluginDir, String pluginKey, String pluginName, pluginCategory, List stepsWithAttachedCredentials) {
+	def loadProcedures(String pluginDir, String pluginKey, String pluginName, List stepsWithAttachedCredentials) {
 
 		// Loop over the sub-directories in the procedures directory
 		// and evaluate procedures if a procedure.dsl file exists
@@ -130,7 +137,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 		
 		// plugin boiler-plate
-		setupPluginMetadata(pluginKey, pluginName, pluginCategory, stepsWithAttachedCredentials)
+		setupPluginMetadata(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	}
 
     def getProcedureDSLFile(File procedureDir) {
