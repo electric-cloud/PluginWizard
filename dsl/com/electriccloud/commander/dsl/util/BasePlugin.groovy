@@ -1,6 +1,7 @@
 package com.electriccloud.commander.dsl.util
 
 import groovy.io.FileType
+import groovy.json.JsonOutput
 import groovy.util.XmlSlurper
 import java.io.File
 
@@ -26,7 +27,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 			description: propDescription
 	} 
 
-	def setupCustomEditorData(String pluginKey, String pluginName, String pluginCategory) {
+	def setupPluginMetadata(String pluginKey, String pluginName, String pluginCategory, List stepsWithAttachedCredentials) {
 		getProcedures(pluginName).each { proc ->
 
 			def addStepPicker = shouldAddStepPicker(pluginName, proc.procedureName)
@@ -36,7 +37,12 @@ abstract class BasePlugin extends DslDelegatingScript {
 				def description = proc.description
 				stepPicker (label, pluginKey, proc.procedureName, pluginCategory, description)
 			}
-			
+			if (proc.procedureName == 'CreateConfiguration' && stepsWithAttachedCredentials) {
+				//Store the list of steps that require credentials to be attached as a procedure property
+				procedure proc.procedureName, {
+					property 'ec_stepsWithAttachedCredentials', value: JsonOutput.toJson(stepsWithAttachedCredentials)
+				}
+			}
 		}
 	}
 	
@@ -44,7 +50,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		getProcedures(pluginName).each { proc ->
 			
 			def addStepPicker = shouldAddStepPicker(pluginName, proc.procedureName)
-			// delete the step picker if it was added by setupCustomEditorData
+			// delete the step picker if it was added by setupPluginMetadata
 			if (addStepPicker) {
 				def label = "$pluginKey - $proc.procedureName"
 				def propName = "/server/ec_customEditors/pickerStep/$label"
@@ -99,7 +105,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
-	def loadProcedures(String pluginDir, String pluginKey, String pluginName, pluginCategory) {
+	def loadProcedures(String pluginDir, String pluginKey, String pluginName, pluginCategory, List stepsWithAttachedCredentials) {
 
 		// Loop over the sub-directories in the procedures directory
 		// and evaluate procedures if a procedure.dsl file exists
@@ -124,7 +130,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 		
 		// plugin boiler-plate
-		setupCustomEditorData(pluginKey, pluginName, pluginCategory)
+		setupPluginMetadata(pluginKey, pluginName, pluginCategory, stepsWithAttachedCredentials)
 	}
 
     def getProcedureDSLFile(File procedureDir) {

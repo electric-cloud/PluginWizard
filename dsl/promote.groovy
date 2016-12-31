@@ -13,21 +13,33 @@ def pluginKey = getProject("/plugins/$pluginName/project").pluginKey
 def pluginDir = getProperty("/projects/$pluginName/pluginDir").value
 
 def pluginCategory = 'Utilities'
+//List of procedure steps to which the plugin configuration credentials need to be attached
+def stepsWithAttachedCredentials = [
+		/*[
+			procedureName: 'Procedure Name',
+			stepName: 'step that needs the credentials to be attached'
+		 ],*/
+	]
 project pluginName, {
 	
 	ec_visibility = 'pickListOnly'
 
 	loadPluginProperties(pluginDir, pluginName)
-	loadProcedures(pluginDir, pluginKey, pluginName, pluginCategory)
+	loadProcedures(pluginDir, pluginKey, pluginName, pluginCategory, stepsWithAttachedCredentials)
+	//plugin configuration metadata
+	property 'ec_config', {
+		form = '$[' + "/projects/${pluginName}/procedures/CreateConfiguration/ec_parameterForm]"
+		property 'fields', {
+			property 'desc', {
+				property 'label', value: 'Description'
+				property 'order', value: '1'
+			}
+		}
+	}
 
 }
 
 // Copy existing plugin configurations from the previous
 // version to this version. At the same time, also attach
 // the credentials to the required plugin procedure steps.
-upgrade(upgradeAction, pluginName, otherPluginName,
-		/*TODO: Add the list of procedure steps to which the plugin configuration credentials need to be attached.*/
-		[/*[
-			procedureName: 'Procedure Name',
-			stepName: 'step that needs the credentials to be attached'
-		 ],*/])
+upgrade(upgradeAction, pluginName, otherPluginName, stepsWithAttachedCredentials)
