@@ -45,8 +45,29 @@ abstract class BasePlugin extends DslDelegatingScript {
 				}
 			}
 		}
+        // configure the plugin icon if is exists
+        setPluginIconIfIconExists(pluginDir, pluginName)
 	}
-	
+
+	def setPluginIconIfIconExists(String pluginDir, String pluginName) {
+
+		String iconRelativePath = getPluginIcon(pluginDir)
+		if (iconRelativePath) {
+			println "Setting icon property /projects/${pluginName}/ec_icon to $iconRelativePath"
+			property "/projects/${pluginName}/ec_icon", value: iconRelativePath
+		}
+	}
+
+	def getPluginIcon(String pluginDir) {
+
+		['svg', 'png'].findResult { ext ->
+			File pluginIcon = new File("$pluginDir/htdocs/images", "icon-plugin.$ext")
+			println "Checking icon file: $pluginIcon.absolutePath, exists? " + pluginIcon.exists()
+			pluginIcon.exists() && pluginIcon.isFile() ?
+					"images/icon-plugin.$ext" : null
+		}
+	}
+
 	def cleanup(String pluginKey, String pluginName) {
 		getProcedures(pluginName).each { proc ->
 			
@@ -177,7 +198,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 				
 			ec_parameterForm = formXml.text
 			formElements.formElement.each { formElement ->
-				formalParameter formElement.property,
+				formalParameter "$formElement.property",
 					defaultValue: formElement.value,
 					required: formElement.required,
 					description: formElement.description,
@@ -197,7 +218,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 				//setup custom editor data for each parameter
 				property 'ec_customEditorData', procedureName: proc.procedureName, {
 					property 'parameters', {
-                       property formElement.property, {
+                       property "$formElement.property", {
 							formType = 'standard'
 						    println "Form element $formElement.property, type: '${formElement.type.toString()}'"
 							if ('checkbox' == formElement.type.toString()) {
