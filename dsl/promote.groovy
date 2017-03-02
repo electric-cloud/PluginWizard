@@ -22,8 +22,6 @@ def stepsWithAttachedCredentials = [
 	
 project pluginName, {
 	
-	ec_visibility = 'pickListOnly'
-
 	loadPluginProperties(pluginDir, pluginName)
 	loadProcedures(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	//plugin configuration metadata
