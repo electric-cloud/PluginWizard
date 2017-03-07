@@ -8,6 +8,7 @@
   <commander-version min="6.0" />
   <description></description>
   <configure>ec_config</configure>
+  <pluginWizardBased>true</pluginWizardBased>
   <depends min="1.4.1">EC-PluginManager</depends>
   <help>help.xml</help>
 </plugin>
