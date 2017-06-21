@@ -13,15 +13,17 @@ def pluginKey = getProject("/plugins/$pluginName/project").pluginKey
 def pluginDir = getProperty("/projects/$pluginName/pluginDir").value
 
 //List of procedure steps to which the plugin configuration credentials need to be attached
+// ** steps with attached credentials
 def stepsWithAttachedCredentials = [
 		/*[
 			procedureName: 'Procedure Name',
 			stepName: 'step that needs the credentials to be attached'
 		 ],*/
 	]
-	
+// ** end steps with attached credentials
+
 project pluginName, {
-	
+
 	loadPluginProperties(pluginDir, pluginName)
 	loadProcedures(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	//plugin configuration metadata
