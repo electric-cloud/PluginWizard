@@ -198,12 +198,16 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 			ec_parameterForm = formXml.text
 			formElements.formElement.each { formElement ->
+				def expansionDeferred = formElement.expansionDeferred == "true" ? "1" : "0"
+				println "expansionDeferred: ${formElement.property}: $expansionDeferred"
+
 				formalParameter "$formElement.property",
 						defaultValue: formElement.value,
 						required: formElement.required,
 						description: formElement.description,
 						type: formElement.type,
-						label: formElement.label
+						label: formElement.label,
+						expansionDeferred: expansionDeferred
 
 				if (formElement['attachedAsParameterToStep'] && formElement['attachedAsParameterToStep'] != '') {
 					formElement['attachedAsParameterToStep'].toString().split(',').each { attachToStep ->
@@ -250,10 +254,38 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 	def upgrade(String upgradeAction, String pluginName,
 				String otherPluginName, List steps,
-				String configName = 'ec_plugin_cfgs') {
+				String configName = 'ec_plugin_cfgs', List properties = []) {
 
 		migrationConfigurations(upgradeAction, pluginName, otherPluginName, steps, configName)
+
+		println "Properties size: " + properties.size()
+        properties.each { propertyName ->
+        	println "Going to migrate $propertyName"
+            migrationProperties(upgradeAction, pluginName, otherPluginName, propertyName)
+        }
+
 	}
+
+
+   def migrationProperties(String upgradeAction, String pluginName, String otherPluginName, String propertyName) {
+        if (upgradeAction == 'upgrade') {
+           def properties = getProperty("/plugins/$otherPluginName/project/$propertyName", suppressNoSuchPropertyException: true)
+           if (!properties) {
+           		println "No properties found for $otherPluginName: $propertyName"
+           		return
+           }
+
+           def existingProperties = getProperty("/plugins/$pluginName/project/$propertyName", suppressNoSuchPropertyException: true)
+           if (existingProperties) {
+           		println "Properties exist in plugin $pluginName: $propertyName"
+           		return
+           }
+
+           clone path: "/plugins/$otherPluginName/project/$propertyName", cloneName: "/plugins/$pluginName/project/$propertyName"
+           println "Cloned /plugins/$otherPluginName/project/$propertyName, /plugins/$pluginName/project/$propertyName"
+ 	   }
+    }
+
 
 	def migrationConfigurations(String upgradeAction, String pluginName,
 								String otherPluginName, List steps,
