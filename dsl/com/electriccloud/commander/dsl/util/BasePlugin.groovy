@@ -198,12 +198,15 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 			ec_parameterForm = formXml.text
 			formElements.formElement.each { formElement ->
+				def deferExpansion = formElement.deferExpansion && formElement.deferExpansion == 'true' ? '1' : '0'
+				println "Defer expansion: ${formElement.property}, $deferExpansion"
 				formalParameter "$formElement.property",
 						defaultValue: formElement.value,
 						required: formElement.required,
 						description: formElement.description,
 						type: formElement.type,
-						label: formElement.label
+						label: formElement.label,
+						expansionDeferred: deferExpansion
 
 				if (formElement['attachedAsParameterToStep'] && formElement['attachedAsParameterToStep'] != '') {
 					formElement['attachedAsParameterToStep'].toString().split(',').each { attachToStep ->
