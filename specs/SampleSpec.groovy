@@ -1,7 +1,5 @@
 import spock.lang.*
 import com.electriccloud.spec.PluginSpockTestSupport
-import JIRAHelper
-import java.util.Random
 
 class SampleSpec extends PluginSpockTestSupport {
 
