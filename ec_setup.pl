@@ -11,9 +11,7 @@ if ( defined $ENV{QUERY_STRING} ) {    # Promotion through UI
 }
 else {
     my $commanderPluginDir = $commander->getProperty('/server/settings/pluginsDirectory')->findvalue('//value');
-    unless ( $commanderPluginDir && -d $commanderPluginDir ) {
-        die "Cannot find commander plugin dir, please ensure that the option server/settings/pluginsDirectory is set up correctly";
-    }
+    # We are not checking for the directory, because we can run this script on a different machine
     $pluginDir = File::Spec->catfile($commanderPluginDir, $pluginName);
 }
 
@@ -33,9 +31,24 @@ if(defined $ENV{QUERY_STRING}) { # Promotion through UI
     $dslFilePath = File::Spec->catfile($pluginDir, "dsl", "$promoteAction.groovy");
 }
 
-open FILE, $dslFilePath or die "Couldn't open file: $dslFilePath: $!";
-my $dsl = <FILE>;
-close FILE;
+my $demoteDsl = q{
+# demote.groovy placeholder
+};
+
+my $promoteDsl = q{
+# promote.groovy placeholder
+};
+
+
+my $dsl;
+if ($promoteAction eq 'promote') {
+  $dsl = $promoteDsl;
+}
+else {
+  $dsl = $demoteDsl;
+}
+
+
 my $dslReponse = $commander->evalDsl(
     $dsl, {
         parameters => qq(
