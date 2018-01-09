@@ -74,44 +74,51 @@ my $errorMessage = $commander->getError();
 if ( !$errorMessage ) {
     # This is here because we cannot do publishArtifactVersion in dsl today
     # delete artifact if it exists first
-    $commander->deleteArtifactVersion("com.electriccloud:PluginWizard-Grapes:1.0.1");
 
     my $dependenciesProperty = '/projects/@PLUGIN_NAME@/ec_groovyDependencies';
-    my $base64 = $commander->getProperty($dependenciesProperty)->findvalue('//value')->string_value;
-    my $binary = decode_base64($base64);
-    my ($tempFh, $tempFilename) = tempfile(CLEANUP => 1);
-    binmode($tempFh);
-    print $tempFh $binary;
-    close $tempFh;
+    my $base64 = '';
+    eval {
+      $base64 = $commander->getProperty($dependenciesProperty)->findvalue('//value')->string_value;
+      1;
+    };
 
-    my ($tempDir) = tempdir(CLEANUP => 1);
-    my $zip = Archive::Zip->new();
-    unless($zip->read($tempFilename) == Archive::Zip::AZ_OK()) {
-      die "Cannot read .zip dependencies: $!";
-    }
-    $zip->extractTree("", File::Spec->catfile($tempDir, ''));
-    warn "Dependencies: $tempDir\n";
+    if ($base64) {
+      my $grapesVersion = '1.0.0';
+      my $groupId = 'com.electriccloud';
+      $commander->deleteArtifactVersion($groupId . ':@PLUGIN_KEY@-Grapes:' . $grapesVersion);
+      my $binary = decode_base64($base64);
+      my ($tempFh, $tempFilename) = tempfile(CLEANUP => 1);
+      binmode($tempFh);
+      print $tempFh $binary;
+      close $tempFh;
 
-    if ( $promoteAction eq "promote" ) {
+      my ($tempDir) = tempdir(CLEANUP => 1);
+      my $zip = Archive::Zip->new();
+      unless($zip->read($tempFilename) == Archive::Zip::AZ_OK()) {
+        die "Cannot read .zip dependencies: $!";
+      }
+      $zip->extractTree("", File::Spec->catfile($tempDir, ''));
 
-        #publish jars to the repo server if the plugin project was created successfully
-        my $am = new ElectricCommander::ArtifactManagement($commander);
-        my $artifactVersion = $am->publish(
-            {   groupId         => "com.electriccloud",
-                artifactKey     => "PluginWizard-Grapes",
-                version         => "1.0.1",
-                includePatterns => "**",
-                fromDirectory   => "$tempDir/lib/grapes",
-                description => "JARs that PluginWizard plugin procedures depend on"
-            }
-        );
+      if ( $promoteAction eq "promote" ) {
+          #publish jars to the repo server if the plugin project was created successfully
+          my $am = new ElectricCommander::ArtifactManagement($commander);
+          my $artifactVersion = $am->publish(
+              {   groupId         => $groupId,
+                  artifactKey     => '@PLUGIN_KEY@-Grapes',
+                  version         => $grapesVersion,
+                  includePatterns => "**",
+                  fromDirectory   => "$tempDir/lib/grapes",
+                  description => 'JARs that @PLUGIN_KEY@ plugin procedures depend on'
+              }
+          );
 
-        # Print out the xml of the published artifactVersion.
-        $logfile .= $artifactVersion->xml() . "\n";
+          # Print out the xml of the published artifactVersion.
+          $logfile .= $artifactVersion->xml() . "\n";
 
-        if ( $artifactVersion->diagnostics() ) {
-            $logfile .= "\nDetails:\n" . $artifactVersion->diagnostics();
-        }
+          if ( $artifactVersion->diagnostics() ) {
+              $logfile .= "\nDetails:\n" . $artifactVersion->diagnostics();
+          }
+      }
     }
 }
 
