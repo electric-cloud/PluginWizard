@@ -311,15 +311,22 @@ abstract class BasePlugin extends DslDelegatingScript {
 					clone path: "/plugins/$otherPluginName/project/credentials/${cred.credentialName}",
 							cloneName: "/plugins/$pluginName/project/credentials/${cred.credentialName}"
 
-					aclEntry principalType: 'user',
-							principalName: "project: $pluginName",
-							projectName: pluginName,
-							credentialName: cred.credentialName,
-							objectType: 'credential',
-							readPrivilege: 'allow',
-							modifyPrivilege: 'allow',
-							executePrivilege: 'allow',
-							changePermissionsPrivilege: 'allow'
+					deleteAclEntry principalType: 'user',
+						principalName: "project: $otherPluginName",
+						projectName: pluginName,
+						credentialName: cred.credentialName
+
+
+					createAclEntry principalType: 'user',
+						principalName: "project: $pluginName",
+						projectName: pluginName,
+						credentialName: cred.credentialName,
+						objectType: 'credential',
+						readPrivilege: 'allow',
+						modifyPrivilege: 'allow',
+						executePrivilege: 'allow',
+						changePermissionsPrivilege: 'allow'
+
 
 					steps.each { s ->
 						attachCredential projectName: pluginName,
