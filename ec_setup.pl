@@ -4,6 +4,7 @@ use POSIX;
 use MIME::Base64;
 use File::Temp qw(tempfile tempdir);
 use Archive::Zip;
+use Digest::MD5 qw(md5_hex);
 
 my $dir = getcwd;
 my $logfile ="";
@@ -52,7 +53,6 @@ else {
   $dsl = $demoteDsl;
 }
 
-
 my $dslReponse = $commander->evalDsl(
     $dsl, {
         parameters => qq(
@@ -77,22 +77,50 @@ if ( !$errorMessage ) {
 
     my $dependenciesProperty = '/projects/@PLUGIN_NAME@/ec_groovyDependencies';
     my $base64 = '';
+    my $xpath;
     eval {
-      $base64 = $commander->getProperty($dependenciesProperty)->findvalue('//value')->string_value;
+      $xpath = $commander->getProperties({path => $dependenciesProperty});
       1;
     };
+    unless($@) {
+      my $blocks = {};
+      my $checksum = '';
+      for my $prop ($xpath->findnodes('//property')) {
+        my $name = $prop->findvalue('propertyName')->string_value;
+        my $value = $prop->findvalue('value')->string_value;
+        if ($name eq 'checksum') {
+          $checksum = $value;
+        }
+        else {
+          my ($number) = $name =~ /ec_dependencyChunk_(\d+)$/;
+          $blocks->{$number} = $value;
+        }
+      }
+      for my $key (sort {$a <=> $b} keys %$blocks) {
+        $base64 .= $blocks->{$key};
+      }
+
+      my $resultChecksum = md5_hex($base64);
+      unless($checksum) {
+        die "No checksum found in dependendencies property, please reinstall the plugin";
+      }
+      if ($resultChecksum ne $checksum) {
+        die "Wrong dependency checksum: original checksum is $checksum";
+      }
+    }
 
     if ($base64) {
       my $grapesVersion = '1.0.0';
+      my $cleanup = 1;
       my $groupId = 'com.electriccloud';
       $commander->deleteArtifactVersion($groupId . ':@PLUGIN_KEY@-Grapes:' . $grapesVersion);
       my $binary = decode_base64($base64);
-      my ($tempFh, $tempFilename) = tempfile(CLEANUP => 1);
+      my ($tempFh, $tempFilename) = tempfile(CLEANUP => $cleanup);
       binmode($tempFh);
       print $tempFh $binary;
       close $tempFh;
 
-      my ($tempDir) = tempdir(CLEANUP => 1);
+      my ($tempDir) = tempdir(CLEANUP => $cleanup);
       my $zip = Archive::Zip->new();
       unless($zip->read($tempFilename) == Archive::Zip::AZ_OK()) {
         die "Cannot read .zip dependencies: $!";
@@ -114,7 +142,6 @@ if ( !$errorMessage ) {
 
           # Print out the xml of the published artifactVersion.
           $logfile .= $artifactVersion->xml() . "\n";
-
           if ( $artifactVersion->diagnostics() ) {
               $logfile .= "\nDetails:\n" . $artifactVersion->diagnostics();
           }

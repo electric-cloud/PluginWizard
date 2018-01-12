@@ -36,6 +36,7 @@ use File::Temp qw(tempfile tempdir);
 use warnings;
 use strict;
 use Archive::Zip;
+use Digest::MD5 qw(md5_hex);
 
 $|=1;
 
@@ -52,13 +53,42 @@ sub retrieveLibs {
     my $property = '/projects/$[/myProject/projectName]/ec_groovyDependencies';
     print "Libs property: $property\n";
     my $libsBase64 = '';
+    my $xpath;
     eval {
-        $libsBase64 = $ec->getProperty($property)->findvalue('//value')->string_value;\
+        $xpath = $ec->getProperties({path => $property});
         1;
     } or do {
         print "[ERROR] cannot get property $property: $@";
         exit -1;
     };
+
+    my $checksum = '';
+    my $blocks = {};
+    for my $prop ($xpath->findnodes('//property')) {
+        my $name = $prop->findvalue('propertyName')->string_value;
+        my $value = $prop->findvalue('value')->string_value;
+        if ($name eq 'checksum') {
+            $checksum = $value;
+        }
+        else {
+            $name =~ s/ec_dependencyChunk_//;
+            $blocks->{$name} = $value;
+        }
+    }
+
+    unless($checksum) {
+        print "[ERROR] No checksum found";
+        exit -1;
+    }
+
+    for my $name (sort { $a <=> $b } keys %$blocks) {
+        $libsBase64 .= $blocks->{$name};
+    }
+    my $finalChecksum = md5_hex($libsBase64);
+    if ($finalChecksum ne $checksum) {
+        print "[ERROR] checksums do not match, expected checksum: $checksum, got checksum: $finalChecksum";
+        exit -1;
+    }
 
     my $binary = decode_base64($libsBase64);
 

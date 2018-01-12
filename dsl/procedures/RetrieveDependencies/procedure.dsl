@@ -1,7 +1,7 @@
 import java.io.File
 
 def procName = 'RetrieveDependencies'
-procedure procName, description: 'Retrieves Groovy dependencies', {
+procedure procName, description: 'Retrieves Groovy dependencies. This procedure can be used as a first step of the procedure which requires dependencies.', {
     property 'standardStepPicker', value: false
 
 	step 'Setup',
