@@ -92,7 +92,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 	}
 
 	def shouldAddStepPicker(def pluginName, def procedureName) {
-		if (procedureName == 'CreateConfiguration' || procedureName == 'DeleteConfiguration') {
+		if (procedureName == 'CreateConfiguration' || procedureName == 'DeleteConfiguration' || procedureName == 'EditConfiguration') {
 			return false
 		}
 		def prop = getProperty("/projects/${pluginName}/procedures/${procedureName}/standardStepPicker", suppressNoSuchPropertyException: true)
