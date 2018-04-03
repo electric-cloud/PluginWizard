@@ -1,35 +1,32 @@
-## PluginWizard ##
+## EC-ReportingTools
+Tools to help create reports from Electric Flow data
 
-<img src="plugin-builder-logo.jpg" width="48">
+# json2table
+Create a table from a JSON string:
+[
+	{
+		"col1": "123",
+		"col2": "456",
+	},
+	{
+		"col1": "789",
+		"col2": "012",
+		"col3": "345"
+	}
+[
 
-###Getting Started###
-1. Download or clone the PluginWizard repository.
+col1	col2	col3
+123		456
+789		012		345
 
-    ```
-	git clone https://github.com/electric-cloud/PluginWizard.git
-    ```
+## Parameters
+jsonData: required, string, JSON array with one or more key-value pairs for each array element
+reportName: optional, string, report name to be used as file name as well
+columnOrnamentation: optional, string JSON key-value pairs of column names and desired HTML formatting
+{
+	"col1": "class: 'active', style:'box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)'",
+	"col3": "a href: 'http://mycompany.com/link/' + $cellValue"
+}
 
-2. Copy to a new directory, say 'MyPlugin'.
 
-    ```
-	cp -r PluginWizard MyPlugin
-    ```
 
-3. Assign a version number to your plugin, e.g., 1.0.0. Edit
-    META-INF/plugin.xml (key, version, label) with the name and version
-    of your plugin.    
-
-4. Setup the directory structure for your procedures as described [here][1].
-
-5. Finally, zip up the files to create the plugin zip file.
-
-    ```
-	 cd MyPlugin
-	 zip -r MyPlugin.zip ./*
-    ```
-
-6. Import the plugin zip file into your ElectricFlow server and promote it.  
-     
-Your plugin procedure is now available for use!
-
-[1]: https://github.com/electric-cloud/Patterns/tree/master/LightningTalks/PluginWizard

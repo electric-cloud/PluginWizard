@@ -1,14 +1,15 @@
 <plugin>
-  <key>PluginWizard</key>
-  <label>PluginWizard</label>
+  <key>EF-ReportingTools</key>
+  <label>EF-ReportingTools</label>
   <version>1.0.0</version>
-  <author>Your name or company name</author>
-  <authorUrl>Your company support url or email</authorUrl>
+  <author>Elcetric Cloud</author>
+  <authorUrl>support@electric-cloud.com</authorUrl>
   <category>Utilities</category>
   <commander-version min="6.0" />
   <description></description>
   <configure>ec_config</configure>
   <pluginWizardBased>true</pluginWizardBased>
   <depends min="1.4.1">EC-PluginManager</depends>
+  <depends min="2.0.5.121268">EC-FileOps</depends>
   <help>help.xml</help>
 </plugin>
