@@ -256,14 +256,13 @@ abstract class BasePlugin extends DslDelegatingScript {
 				String otherPluginName, List steps,
 				String configName = 'ec_plugin_cfgs', List properties = []) {
 
-		migrationConfigurations(upgradeAction, pluginName, otherPluginName, steps, configName)
 
+		migrationConfigurations(upgradeAction, pluginName, otherPluginName, steps, configName)
 		println "Properties size: " + properties.size()
         properties.each { propertyName ->
         	println "Going to migrate $propertyName"
             migrationProperties(upgradeAction, pluginName, otherPluginName, propertyName)
         }
-
 	}
 
 
@@ -311,15 +310,27 @@ abstract class BasePlugin extends DslDelegatingScript {
 					clone path: "/plugins/$otherPluginName/project/credentials/${cred.credentialName}",
 							cloneName: "/plugins/$pluginName/project/credentials/${cred.credentialName}"
 
-					aclEntry principalType: 'user',
-							principalName: "project: $pluginName",
-							projectName: pluginName,
-							credentialName: cred.credentialName,
-							objectType: 'credential',
-							readPrivilege: 'allow',
-							modifyPrivilege: 'allow',
-							executePrivilege: 'allow',
-							changePermissionsPrivilege: 'allow'
+					deleteAclEntry principalType: 'user',
+						principalName: "project: $otherPluginName",
+						projectName: pluginName,
+						credentialName: cred.credentialName
+
+					// For some reason aclEntry() does not work here
+					deleteAclEntry principalType: 'user',
+						principalName: "project: $pluginName",
+						projectName: pluginName,
+						credentialName: cred.credentialName
+
+					createAclEntry principalType: 'user',
+						principalName: "project: $pluginName",
+						projectName: pluginName,
+						credentialName: cred.credentialName,
+						objectType: 'credential',
+						readPrivilege: 'allow',
+						modifyPrivilege: 'allow',
+						executePrivilege: 'allow',
+						changePermissionsPrivilege: 'allow'
+
 
 					steps.each { s ->
 						attachCredential projectName: pluginName,
