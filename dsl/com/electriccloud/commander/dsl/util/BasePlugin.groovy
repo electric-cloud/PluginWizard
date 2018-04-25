@@ -138,7 +138,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
-	def loadProcedures(String pluginDir, String pluginKey, String pluginName, List stepsWithAttachedCredentials) {
+	def loadProcedures(String pluginDir, String pluginKey, String pluginName, List stepsWithAttachedCredentials, String serverVersion = '') {
 
 		// Loop over the sub-directories in the procedures directory
 		// and evaluate procedures if a procedure.dsl file exists
@@ -148,8 +148,11 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 			File procDslFile = getProcedureDSLFile(it)
 			if (procDslFile?.exists()) {
+				def version = parseVersion(serverVersion)
+
 				println "Processing procedure DSL file ${procDslFile.absolutePath}"
-				def proc = loadProcedure(pluginDir, pluginKey, pluginName, procDslFile.absolutePath)
+				def proc = loadProcedure(pluginDir, pluginKey, pluginName, procDslFile.absolutePath, version)
+
 
 				//create formal parameters using form.xml
 				File formXml = new File(it, 'form.xml')
@@ -166,6 +169,17 @@ abstract class BasePlugin extends DslDelegatingScript {
 		setupPluginMetadata(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	}
 
+	def parseVersion(String version) {
+		def retval = [:]
+		try {
+			def (major, minor, patch, build) = version.split(/\./)
+			retval = [major: major as int, minor: minor as int, patch: patch as int, build: build as int]
+		} catch (Throwable e) {
+			println "No server version: cannot parse ${version}"
+		}
+		retval
+	}
+
 	def getProcedureDSLFile(File procedureDir) {
 
 		if (procedureDir.name.toLowerCase().endsWith('_ignore')) {
@@ -180,8 +194,8 @@ abstract class BasePlugin extends DslDelegatingScript {
 		}
 	}
 
-	def loadProcedure(String pluginDir, String pluginKey, String pluginName, String dslFile) {
-		return evalInlineDsl(dslFile, [pluginKey: pluginKey, pluginName: pluginName, pluginDir: pluginDir])
+	def loadProcedure(String pluginDir, String pluginKey, String pluginName, String dslFile, Map version) {
+		return evalInlineDsl(dslFile, [pluginKey: pluginKey, pluginName: pluginName, pluginDir: pluginDir, serverVersion: version])
 	}
 
 	//Helper function to load another dsl script and evaluate it in-context
