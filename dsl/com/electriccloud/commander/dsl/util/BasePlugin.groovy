@@ -42,7 +42,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 				//Store the list of steps that require credentials to be attached as a procedure property
 				procedure proc.procedureName, {
 					property 'ec_stepsWithAttachedCredentials', value: JsonOutput.toJson(stepsWithAttachedCredentials)
-		}
+		        }
 			}
 		}
 		// configure the plugin icon if is exists
@@ -195,6 +195,10 @@ abstract class BasePlugin extends DslDelegatingScript {
 		return script.run();
 	}
 
+	def nullIfEmpty(def value) {
+		value == '' ? null : value 
+	}
+	
 	def buildFormalParametersFromFormXml(def proc, File formXml) {
 
 		def formElements = new XmlSlurper().parseText(formXml.text)
@@ -208,7 +212,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 
 				formalParameter "$formElement.property",
 						defaultValue: formElement.value,
-						required: formElement.required,
+						required: nullIfEmpty(formElement.condition) ? 0 : ( nullIfEmpty(formElement.required) ?: 0 ),
 						description: formElement.documentation,
 						type: formElement.type,
 						label: formElement.label,
