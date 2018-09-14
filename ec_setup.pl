@@ -148,4 +148,4 @@ if ( !$errorMessage ) {
 my $nowString = localtime;
 $commander->setProperty( "/plugins/$pluginName/project/logs/$nowString", { value => $logfile } );
 
-die $errorMessage unless !$errorMessage
+die $errorMessage unless !$errorMessage;
