@@ -37,78 +37,160 @@ use warnings;
 use strict;
 use Archive::Zip;
 use Digest::MD5 qw(md5_hex);
+use File::Spec;
+use JSON qw(decode_json);
 
 $|=1;
 
+my $ec = ElectricCommander->new();
 
 sub main() {
-    my $ec = ElectricCommander->new();
-    $ec->abortOnError(1);
-    retrieveLibs($ec);
+
+    grabResource();
+
+    eval {
+        sendDependencies();
+    };
+    if ($@) {
+        my $err = $@;
+        $ec->setProperty('/myJobStep/summary', $err);
+        exit 1;
+    }
 }
 
-sub retrieveLibs {
-    my ($ec) = @_;
+sub grabResource {
+    my $resName = '$[/myResource/resourceName]';
+    $ec->setProperty('/myJob/grabbedResource', $resName);
+    print "Grabbed Resource: $resName\n";
+}
 
-    my $property = '/projects/$[/myProject/projectName]/ec_groovyDependencies';
-    print "Libs property: $property\n";
-    my $libsBase64 = '';
-    my $xpath;
-    eval {
-        $xpath = $ec->getProperties({path => $property});
-        1;
-    } or do {
-        print "[ERROR] cannot get property $property: $@";
-        exit -1;
-    };
+sub getServerResource {
+    return 'local';
+}
 
-    my $checksum = '';
-    my $blocks = {};
-    for my $prop ($xpath->findnodes('//property')) {
-        my $name = $prop->findvalue('propertyName')->string_value;
-        my $value = $prop->findvalue('value')->string_value;
-        if ($name eq 'checksum') {
-            $checksum = $value;
+
+sub sendDependencies {
+    my $serverResource = getServerResource();
+    my $grapeFolder = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
+    my $channel = int rand 9999999;
+    my $sendStep = q{
+use strict;
+use warnings;
+use ElectricCommander;
+use JSON qw(encode_json);
+use Data::Dumper;
+
+my $ec = ElectricCommander->new;
+
+my $pluginsFolder = eval {
+    $ec->getProperty('/server/settings/pluginsDirectory')->findvalue('//value')->string_value;
+};
+if ($@) {
+    handleError("Cannot get plugins folder, check for /server/settings/pluginsDirectory server property");
+}
+
+unless( -d $pluginsFolder ){
+    handleError("Plugins folder $pluginsFolder does not exist");
+}
+
+my $projectName = '$[/myProject/projectName]';
+my $folder = File::Spec->catfile($pluginsFolder, $projectName, 'lib');
+unless(-d $folder) {
+    handleError("Folder $folder does not exist");
+}
+
+my @files = scanFiles($folder);
+
+my %mapping = ();
+my $channel = '#channel#';
+print "Channel: $channel\n";
+# Will be replaced
+my $grapeFolder = '#grapeFolder#';
+# TODO checksums
+for my $file (@files) {
+    my $relPath = File::Spec->abs2rel($file, $folder);
+    my $destPath = "$grapeFolder/$relPath";
+    $mapping{$file} = $destPath;
+}
+
+my $response = $ec->putFiles($ENV{COMMANDER_JOBID}, \%mapping, {channel => $channel});
+$ec->setProperty('/myJob/ec_dependencies_files', encode_json(\%mapping));
+
+sub handleError {
+    my ($error) = @_;
+
+    print 'Error: ' . $error;
+    $ec->setProperty('/myJobStep/summary', $error);
+    exit 1;
+}
+
+
+
+sub scanFiles {
+    my ($dir) = @_;
+
+    my @files = ();
+    opendir my $dh, $dir or handleError("Cannot open folder $dir: $!");
+    for my $file (readdir $dh) {
+        next if $file =~ /^\./;
+
+        my $fullPath = File::Spec->catfile($dir, $file);
+        if (-d $fullPath) {
+            push @files, scanFiles($fullPath);
         }
         else {
-            $name =~ s/ec_dependencyChunk_//;
-            $blocks->{$name} = $value;
+            push @files, $fullPath;
+        }
+    }
+    return @files;
+}
+
+    };
+
+    $sendStep =~ s/\#grapeFolder\#/$grapeFolder/;
+    $sendStep =~ s/\#channel\#/$channel/;
+    my $xpath = $ec->createJobStep({
+        jobStepName => 'Grab Dependencies',
+        command => $sendStep,
+        shell => 'ec-perl',
+        resourceName => $serverResource
+    });
+
+    my $jobStepId = $xpath->findvalue('//jobStepId')->string_value;
+    print "Job Step ID: $jobStepId\n";
+    my $completed = 0;
+    while(!$completed) {
+        my $status = $ec->getJobStepStatus($jobStepId)->findvalue('//status')->string_value;
+        if ($status eq 'completed') {
+            $completed = 1;
         }
     }
 
-    unless($checksum) {
-        print "[ERROR] No checksum found";
-        exit -1;
+    my $err;
+    my $timeout = 60;
+    $ec->getFiles({error => \$err, channel => $channel, timeout => $timeout});
+    if ($err) {
+        die $err;
+    }
+    my $files = eval {
+        $ec->getProperty('/myJob/ec_dependencies_files')->findvalue('//value')->string_value;
+    };
+    if ($@) {
+        die "Cannot get property ec_dependencies_files from the job: $@";
     }
 
-    for my $name (sort { $a <=> $b } keys %$blocks) {
-        $libsBase64 .= $blocks->{$name};
+    my $mapping = decode_json($files);
+    for my $file (keys %$mapping) {
+        my $dest = $mapping->{$file};
+        if (-f $dest) {
+            print "Got file $dest\n";
+        }
+        else {
+            die "The file $dest was not received\n";
+        }
     }
-    my $finalChecksum = md5_hex($libsBase64);
-    if ($finalChecksum ne $checksum) {
-        print "[ERROR] checksums do not match, expected checksum: $checksum, got checksum: $finalChecksum";
-        exit -1;
-    }
-
-    my $binary = decode_base64($libsBase64);
-
-    my ($tempFh, $tempFilename) = tempfile(CLEANUP => 1);
-    binmode($tempFh);
-    print $tempFh $binary;
-    close $tempFh;
-
-    my $zip = Archive::Zip->new($tempFilename);
-
-    my @members = $zip->members;
-    for my $member ( $zip->members ) {
-        print $member->fileName . "\n";
-    }
-    my $dataDirectory = $ENV{COMMANDER_DATA} || die 'Data directory is not defined!';
-    my $destinationFolder = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape', '');
-
-    $zip->extractTree('lib', $destinationFolder);
-    print "Extracted dependencies into $destinationFolder\n";
 }
+
 
 
 main();
