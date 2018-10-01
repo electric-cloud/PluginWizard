@@ -39,6 +39,7 @@ use Archive::Zip;
 use Digest::MD5 qw(md5_hex);
 use File::Spec;
 use JSON qw(decode_json);
+use File::Copy::Recursive qw(dircopy);
 
 $|=1;
 
@@ -47,12 +48,13 @@ my $ec = ElectricCommander->new();
 sub main() {
 
     grabResource();
-
+    my $projectName = '$[/myProject/projectName]';
     eval {
-        sendDependencies();
+        sendDependencies($projectName);
     };
     if ($@) {
         my $err = $@;
+        print "$err\n";
         $ec->setProperty('/myJobStep/summary', $err);
         exit 1;
     }
@@ -65,14 +67,75 @@ sub grabResource {
 }
 
 sub getServerResource {
-    return 'local';
+    my @filterList = ();
+
+    push (@filterList, {"propertyName" => "hostName",
+                            "operator" => "equals",
+                            "operand1" => "localhost"});
+
+    push (@filterList, {"propertyName" => "hostName",
+                            "operator" => "equals",
+                            "operand1" => "127.0.0.1"});
+
+    my $hostname = $ec->getProperty('/server/hostName')->findvalue('//value')->string_value;
+
+    push (@filterList, {"propertyName" => "hostName",
+                            "operator" => "equals",
+                            "operand1" => "$hostname"});
+
+    my $result = $ec->findObjects('resource',
+            {filter => [
+         { operator => 'or',
+             filter => \@filterList,
+        }
+      ], numObjects => 1}
+    );
+
+    my $resourceName = eval {
+        $result->findvalue('//resourceName')->string_value;
+    };
+
+    my $serverResource = eval {
+        $ec->getProperty('/server/settings/localResourceName')->findvalue('//value')->string_value
+    };
+
+    unless($serverResource) {
+        die "Cannot find local resource name, please set server property localResourceName to the name of your local resource"
+    }
 }
 
 
+sub copyDependencies {
+    my ($projectName) = @_;
+
+    my $source = getPluginsFolder() . "/$projectName/lib";
+    my $dest = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
+    dircopy($source, $dest);
+}
+
+
+sub getPluginsFolder {
+    return $ec->getProperty('/server/settings/pluginsDirectory')->findvalue('//value')->string_value;
+}
+
 sub sendDependencies {
+    my ($projectName) = @_;
+
     my $serverResource = getServerResource();
+    my $currentResource = '$[/myResource/resourceName]';
+    if ($serverResource eq $currentResource) {
+        return copyDependencies($projectName);
+    }
+
     my $grapeFolder = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
+    my $windows = $^O =~ /win32/;
+
     my $channel = int rand 9999999;
+    my $pluginFolder = eval {
+        my $pluginsFolder = getPluginsFolder();
+        $pluginsFolder . '/' . $projectName;
+    };
+
     my $sendStep = q{
 use strict;
 use warnings;
@@ -80,21 +143,12 @@ use ElectricCommander;
 use JSON qw(encode_json);
 use Data::Dumper;
 
+my $pluginFolder = '#pluginFolder#';
+my $delimeter = '#delimeter#';
+
 my $ec = ElectricCommander->new;
 
-my $pluginsFolder = eval {
-    $ec->getProperty('/server/settings/pluginsDirectory')->findvalue('//value')->string_value;
-};
-if ($@) {
-    handleError("Cannot get plugins folder, check for /server/settings/pluginsDirectory server property");
-}
-
-unless( -d $pluginsFolder ){
-    handleError("Plugins folder $pluginsFolder does not exist");
-}
-
-my $projectName = '$[/myProject/projectName]';
-my $folder = File::Spec->catfile($pluginsFolder, $projectName, 'lib');
+my $folder = File::Spec->catfile($pluginFolder, 'lib');
 unless(-d $folder) {
     handleError("Folder $folder does not exist");
 }
@@ -106,10 +160,11 @@ my $channel = '#channel#';
 print "Channel: $channel\n";
 # Will be replaced
 my $grapeFolder = '#grapeFolder#';
-# TODO checksums
+
 for my $file (@files) {
     my $relPath = File::Spec->abs2rel($file, $folder);
-    my $destPath = "$grapeFolder/$relPath";
+    my $destPath = "grape/$relPath";
+    print "Sending $file to $destPath\n";
     $mapping{$file} = $destPath;
 }
 
@@ -148,7 +203,10 @@ sub scanFiles {
     };
 
     $sendStep =~ s/\#grapeFolder\#/$grapeFolder/;
+    $sendStep =~ s/\#pluginFolder\#/$pluginFolder/;
     $sendStep =~ s/\#channel\#/$channel/;
+    my $delimeter = $windows ? '\\' : '/';
+    $sendStep =~ s/\#delimeter\#/$delimeter/;
     my $xpath = $ec->createJobStep({
         jobStepName => 'Grab Dependencies',
         command => $sendStep,
@@ -189,6 +247,10 @@ sub scanFiles {
             die "The file $dest was not received\n";
         }
     }
+    unless( -w $grapeFolder) {
+        die "$grapeFolder is not writable. Please allow agent user to write to this directory."
+    }
+    rename('grape', $grapeFolder);
 }
 
 
