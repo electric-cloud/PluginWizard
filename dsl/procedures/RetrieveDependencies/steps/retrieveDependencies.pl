@@ -28,18 +28,10 @@ to the grape root directory configured with ec-groovy.
 
 =cut
 
-use File::Copy::Recursive qw(rcopy rmove);
-use File::Path;
 use ElectricCommander;
-use MIME::Base64;
-use File::Temp qw(tempfile tempdir);
 use warnings;
 use strict;
-use Archive::Zip;
-use Digest::MD5 qw(md5_hex);
-use File::Spec;
-use JSON qw(decode_json);
-use Data::Dumper;
+
 
 $|=1;
 
@@ -47,10 +39,11 @@ my $ec = ElectricCommander->new();
 
 sub main() {
 
-    grabResource();
+    my $dep = EC::DependencyManager->new($ec);
+    $dep->grabResource();
     my $projectName = '$[/myProject/projectName]';
     eval {
-        sendDependencies($projectName);
+        $dep->sendDependencies($projectName);
     };
     if ($@) {
         my $err = $@;
@@ -60,18 +53,49 @@ sub main() {
     }
 }
 
+
+
+main();
+
+1;
+
+
+package EC::DependencyManager;
+use strict;
+use warnings;
+
+use File::Spec;
+use JSON qw(decode_json);
+use File::Copy::Recursive qw(rcopy rmove);
+
+
+sub new {
+    my ($class, $ec) = @_;
+
+    my $self = { ec => $ec };
+    return bless $self, $class;
+}
+
+sub ec {
+    return shift->{ec};
+}
+
 sub grabResource {
+    my ($self) = @_;
+
     my $resName = '$[/myResource/resourceName]';
-    $ec->setProperty('/myJob/grabbedResource', $resName);
+    $self->ec->setProperty('/myJob/grabbedResource', $resName);
     print "Grabbed Resource: $resName\n";
 }
 
 sub getLocalResource {
+    my ($self) = @_;
+
     my @filterList = ();
 
     my $propertyPath = '/server/settings/localResourceName';
     my $serverResource = eval {
-        $ec->getProperty($propertyPath)->findvalue('//value')->string_value
+        $self->ec->getProperty($propertyPath)->findvalue('//value')->string_value
     };
 
     if ($serverResource) {
@@ -87,7 +111,7 @@ sub getLocalResource {
                             "operator" => "equals",
                             "operand1" => "127.0.0.1"});
 
-    my $hostname = $ec->getProperty('/server/hostName')->findvalue('//value')->string_value;
+    my $hostname = $self->ec->getProperty('/server/hostName')->findvalue('//value')->string_value;
     print "Hostname is $hostname\n";
 
     push (@filterList, {"propertyName" => "hostName",
@@ -99,7 +123,7 @@ sub getLocalResource {
                             "operand1" => "local"});
 
 
-    my $result = $ec->findObjects('resource',
+    my $result = $self->ec->findObjects('resource',
             {filter => [
          { operator => 'or',
              filter => \@filterList,
@@ -119,9 +143,9 @@ sub getLocalResource {
 
 
 sub copyDependencies {
-    my ($projectName) = @_;
+    my ($self, $projectName) = @_;
 
-    my $source = getPluginsFolder() . "/$projectName/lib";
+    my $source = $self->getPluginsFolder() . "/$projectName/lib";
     my $dest = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
     unless( -w $dest) {
         die "$dest is not writable. Please allow agent user to write to this directory."
@@ -134,16 +158,18 @@ sub copyDependencies {
 
 
 sub getPluginsFolder {
-    return $ec->getProperty('/server/settings/pluginsDirectory')->findvalue('//value')->string_value;
+    my ($self) = @_;
+
+    return $self->ec->getProperty('/server/settings/pluginsDirectory')->findvalue('//value')->string_value;
 }
 
 sub sendDependencies {
-    my ($projectName) = @_;
+    my ($self, $projectName) = @_;
 
-    my $serverResource = getLocalResource();
+    my $serverResource = $self->getLocalResource();
     my $currentResource = '$[/myResource/resourceName]';
     if ($serverResource eq $currentResource) {
-        return copyDependencies($projectName);
+        return $self->copyDependencies($projectName);
     }
 
     my $grapeFolder = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
@@ -151,7 +177,7 @@ sub sendDependencies {
 
     my $channel = int rand 9999999;
     my $pluginFolder = eval {
-        my $pluginsFolder = getPluginsFolder();
+        my $pluginsFolder = $self->getPluginsFolder();
         $pluginsFolder . '/' . $projectName;
     };
 
@@ -222,7 +248,7 @@ sub scanFiles {
     $sendStep =~ s/\#pluginFolder\#/$pluginFolder/;
     $sendStep =~ s/\#channel\#/$channel/;
 
-    my $xpath = $ec->createJobStep({
+    my $xpath = $self->ec->createJobStep({
         jobStepName => 'Grab Dependencies',
         command => $sendStep,
         shell => 'ec-perl',
@@ -233,7 +259,7 @@ sub scanFiles {
     print "Job Step ID: $jobStepId\n";
     my $completed = 0;
     while(!$completed) {
-        my $status = $ec->getJobStepStatus($jobStepId)->findvalue('//status')->string_value;
+        my $status = $self->ec->getJobStepStatus($jobStepId)->findvalue('//status')->string_value;
         if ($status eq 'completed') {
             $completed = 1;
         }
@@ -241,12 +267,12 @@ sub scanFiles {
 
     my $err;
     my $timeout = 60;
-    $ec->getFiles({error => \$err, channel => $channel, timeout => $timeout});
+    $self->ec->getFiles({error => \$err, channel => $channel, timeout => $timeout});
     if ($err) {
         die $err;
     }
     my $files = eval {
-        $ec->getProperty('/myJob/ec_dependencies_files')->findvalue('//value')->string_value;
+        $self->ec->getProperty('/myJob/ec_dependencies_files')->findvalue('//value')->string_value;
     };
     if ($@) {
         die "Cannot get property ec_dependencies_files from the job: $@";
@@ -270,9 +296,5 @@ sub scanFiles {
         die "Copy failed, no files were copied to $grapeFolder, please check permissions for the directory $grapeFolder";
     }
 }
-
-
-
-main();
 
 1;
