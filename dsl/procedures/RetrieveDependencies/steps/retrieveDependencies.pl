@@ -28,7 +28,7 @@ to the grape root directory configured with ec-groovy.
 
 =cut
 
-use File::Copy::Recursive qw(rcopy);
+use File::Copy::Recursive qw(rcopy rmove);
 use File::Path;
 use ElectricCommander;
 use MIME::Base64;
@@ -39,7 +39,7 @@ use Archive::Zip;
 use Digest::MD5 qw(md5_hex);
 use File::Spec;
 use JSON qw(decode_json);
-use File::Copy::Recursive qw(dircopy);
+use Data::Dumper;
 
 $|=1;
 
@@ -66,8 +66,18 @@ sub grabResource {
     print "Grabbed Resource: $resName\n";
 }
 
-sub getServerResource {
+sub getLocalResource {
     my @filterList = ();
+
+    my $propertyPath = '/server/settings/localResourceName';
+    my $serverResource = eval {
+        $ec->getProperty($propertyPath)->findvalue('//value')->string_value
+    };
+
+    if ($serverResource) {
+        print "Configured Local Resource is $serverResource (taken from $propertyPath)\n";
+        return $serverResource;
+    }
 
     push (@filterList, {"propertyName" => "hostName",
                             "operator" => "equals",
@@ -78,10 +88,16 @@ sub getServerResource {
                             "operand1" => "127.0.0.1"});
 
     my $hostname = $ec->getProperty('/server/hostName')->findvalue('//value')->string_value;
+    print "Hostname is $hostname\n";
 
     push (@filterList, {"propertyName" => "hostName",
                             "operator" => "equals",
                             "operand1" => "$hostname"});
+
+    push (@filterList, {"propertyName" => "resourceName",
+                            "operator" => "equals",
+                            "operand1" => "local"});
+
 
     my $result = $ec->findObjects('resource',
             {filter => [
@@ -94,14 +110,11 @@ sub getServerResource {
     my $resourceName = eval {
         $result->findvalue('//resourceName')->string_value;
     };
-
-    my $serverResource = eval {
-        $ec->getProperty('/server/settings/localResourceName')->findvalue('//value')->string_value
-    };
-
-    unless($serverResource) {
-        die "Cannot find local resource name, please set server property localResourceName to the name of your local resource"
+    unless($resourceName) {
+        die "Cannot find local resource and there is no local resource in the configuration. Please set property $propertyPath to the name of your local resource or resource pool.";
     }
+    print "Found local resource: $resourceName\n";
+    return $resourceName;
 }
 
 
@@ -110,7 +123,13 @@ sub copyDependencies {
 
     my $source = getPluginsFolder() . "/$projectName/lib";
     my $dest = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
-    dircopy($source, $dest);
+    unless( -w $dest) {
+        die "$dest is not writable. Please allow agent user to write to this directory."
+    }
+    my $filesCopied = rcopy($source, $dest);
+    if ($filesCopied == 0) {
+        die "Copy failed, no files were copied from $source to $dest, please check permissions for $dest";
+    }
 }
 
 
@@ -121,7 +140,7 @@ sub getPluginsFolder {
 sub sendDependencies {
     my ($projectName) = @_;
 
-    my $serverResource = getServerResource();
+    my $serverResource = getLocalResource();
     my $currentResource = '$[/myResource/resourceName]';
     if ($serverResource eq $currentResource) {
         return copyDependencies($projectName);
@@ -158,8 +177,6 @@ my @files = scanFiles($folder);
 my %mapping = ();
 my $channel = '#channel#';
 print "Channel: $channel\n";
-# Will be replaced
-my $grapeFolder = '#grapeFolder#';
 
 for my $file (@files) {
     my $relPath = File::Spec->abs2rel($file, $folder);
@@ -202,11 +219,9 @@ sub scanFiles {
 
     };
 
-    $sendStep =~ s/\#grapeFolder\#/$grapeFolder/;
     $sendStep =~ s/\#pluginFolder\#/$pluginFolder/;
     $sendStep =~ s/\#channel\#/$channel/;
-    my $delimeter = $windows ? '\\' : '/';
-    $sendStep =~ s/\#delimeter\#/$delimeter/;
+
     my $xpath = $ec->createJobStep({
         jobStepName => 'Grab Dependencies',
         command => $sendStep,
@@ -250,7 +265,10 @@ sub scanFiles {
     unless( -w $grapeFolder) {
         die "$grapeFolder is not writable. Please allow agent user to write to this directory."
     }
-    rename('grape', $grapeFolder);
+    my $filesCopied = rmove('grape', $grapeFolder);
+    if ($filesCopied == 0) {
+        die "Copy failed, no files were copied to $grapeFolder, please check permissions for the directory $grapeFolder";
+    }
 }
 
 
