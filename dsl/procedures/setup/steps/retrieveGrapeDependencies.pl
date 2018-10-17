@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+# File Version: Wed Oct 17 15:14:57 2018
 
 =head1 NAME
 
@@ -28,22 +29,55 @@ to the grape root directory configured with ec-groovy.
 
 =cut
 
+use File::Copy::Recursive qw(rcopy);
+use File::Path;
 use ElectricCommander;
+
 use warnings;
 use strict;
-
-
 $|=1;
 
-my $ec = ElectricCommander->new();
+
+$::gAdditionalArtifactVersion = "$[additionalArtifactVersion]";
 
 sub main() {
+    my $ec = ElectricCommander->new();
+    $ec->abortOnError(1);
+
+    my $pluginName = eval {
+        $ec->getProperty('additionalPluginName')->findvalue('//value')->string_value
+    };
+    my @projects = ();
+    push @projects, '$[/myProject/projectName]';
+
+    if ($pluginName) {
+        # This is a new one
+        my @names = split(/\s*,\s*/, $pluginName);
+        for my $name (@names) {
+            my $projectName = $ec->getPlugin($pluginName)->findvalue('//projectName')->string_value;
+            push @projects, $projectName;
+        }
+    }
+
+    retrieveDependencies($ec, @projects);
+
+    # This part remains as is
+    if ($::gAdditionalArtifactVersion ne '') {
+        my @versions = split(/\s*,\s*/, $::gAdditionalArtifactVersion);
+        for my $version (@versions) {
+            retrieveGrapeDependency($ec, $version);
+        }
+    }
+}
+
+
+sub retrieveDependencies {
+    my ($ec, @projects) = @_;
 
     my $dep = EC::DependencyManager->new($ec);
     $dep->grabResource();
-    my $projectName = '$[/myProject/projectName]';
     eval {
-        $dep->sendDependencies($projectName);
+        $dep->sendDependencies(@projects);
     };
     if ($@) {
         my $err = $@;
@@ -53,12 +87,45 @@ sub main() {
     }
 }
 
+########################################################################
+# retrieveGrapeDependency - Retrieves the artifact version and copies it
+# to the grape directory used by ec-groovy for @Grab dependencies
+#
+# Arguments:
+#   -ec
+#   -artifactVersion
+########################################################################
+sub retrieveGrapeDependency($){
+    my ($ec, $artifactVersion) = @_;
 
+    my $xpath = $ec->retrieveArtifactVersions({
+        artifactVersionName => $artifactVersion
+    });
+
+    # copy to the grape directory ourselves instead of letting
+    # retrieveArtifactVersions download to it directly to give
+    # us better control over the over-write/update capability.
+    # We want to copy only files the retrieved files leaving
+    # the other files in the grapes directory unchanged.
+    my $dataDir = $ENV{COMMANDER_DATA};
+    die "ERROR: Data directory not defined!" unless ($dataDir);
+
+    my $grapesDir = $ENV{COMMANDER_DATA} . '/grape/grapes';
+    my $dir = $xpath->findvalue("//artifactVersion/cacheDirectory");
+
+    mkpath($grapesDir);
+    die "ERROR: Cannot create target directory" unless( -e $grapesDir );
+
+    rcopy( $dir, $grapesDir) or die "Copy failed: $!";
+    print "Retrieved and copied grape dependencies from $dir to $grapesDir\n";
+}
 
 main();
 
 1;
 
+
+# File Version: Wed Oct 17 15:24:07 2018
 
 package EC::DependencyManager;
 use strict;
@@ -68,6 +135,7 @@ use File::Spec;
 use JSON qw(decode_json);
 use File::Copy::Recursive qw(rcopy rmove);
 
+our $VERSION = '1.0.0';
 
 sub new {
     my ($class, $ec) = @_;
@@ -147,9 +215,18 @@ sub copyDependencies {
 
     my $source = $self->getPluginsFolder() . "/$projectName/lib";
     my $dest = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
+    unless(-d $source) {
+        die "Folder $source does not exist, please try to reinstall the plugin."
+    }
+
+    unless(-d $dest) {
+        mkdir($dest);
+    }
+
     unless( -w $dest) {
         die "$dest is not writable. Please allow agent user to write to this directory."
     }
+
     my $filesCopied = rcopy($source, $dest);
     if ($filesCopied == 0) {
         die "Copy failed, no files were copied from $source to $dest, please check permissions for $dest";
@@ -164,22 +241,26 @@ sub getPluginsFolder {
 }
 
 sub sendDependencies {
-    my ($self, $projectName) = @_;
+    my ($self, @projects) = @_;
 
     my $serverResource = $self->getLocalResource();
     my $currentResource = '$[/myResource/resourceName]';
     if ($serverResource eq $currentResource) {
-        return $self->copyDependencies($projectName);
+        for my $projectName (@projects) {
+            $self->copyDependencies($projectName);
+        }
+        return;
     }
 
     my $grapeFolder = File::Spec->catfile($ENV{COMMANDER_DATA}, 'grape');
     my $windows = $^O =~ /win32/;
 
     my $channel = int rand 9999999;
-    my $pluginFolder = eval {
-        my $pluginsFolder = $self->getPluginsFolder();
-        $pluginsFolder . '/' . $projectName;
-    };
+
+    my $pluginsFolder = $self->getPluginsFolder;
+    my @folders = map {
+        $pluginsFolder . '/' . $_;
+    } @projects;
 
     my $sendStep = q{
 use strict;
@@ -188,27 +269,28 @@ use ElectricCommander;
 use JSON qw(encode_json);
 use Data::Dumper;
 
-my $pluginFolder = '#pluginFolder#';
-my $delimeter = '#delimeter#';
+my $pluginFolders = '#pluginFolders#';
+my @folders = split(';', $pluginFolders);
 
 my $ec = ElectricCommander->new;
-
-my $folder = File::Spec->catfile($pluginFolder, 'lib');
-unless(-d $folder) {
-    handleError("Folder $folder does not exist");
-}
-
-my @files = scanFiles($folder);
-
-my %mapping = ();
 my $channel = '#channel#';
 print "Channel: $channel\n";
 
-for my $file (@files) {
-    my $relPath = File::Spec->abs2rel($file, $folder);
-    my $destPath = "grape/$relPath";
-    print "Sending $file to $destPath\n";
-    $mapping{$file} = $destPath;
+my %mapping = ();
+for my $folder (@folders) {
+    $folder = File::Spec->catfile($folder, 'lib');
+    print "$folder\n";
+    unless(-d $folder) {
+        handleError("Folder $folder does not exist");
+    }
+    my @files = scanFiles($folder);
+
+
+    for my $file (@files) {
+        my $relPath = File::Spec->abs2rel($file, $folder);
+        my $destPath = "grape/$relPath";
+        $mapping{$file} = $destPath;
+    }
 }
 
 my $response = $ec->putFiles($ENV{COMMANDER_JOBID}, \%mapping, {channel => $channel});
@@ -221,8 +303,6 @@ sub handleError {
     $ec->setProperty('/myJobStep/summary', $error);
     exit 1;
 }
-
-
 
 sub scanFiles {
     my ($dir) = @_;
@@ -245,7 +325,8 @@ sub scanFiles {
 
     };
 
-    $sendStep =~ s/\#pluginFolder\#/$pluginFolder/;
+    my $pluginFolders = join(';', @folders);
+    $sendStep =~ s/\#pluginFolders\#/$pluginFolders/;
     $sendStep =~ s/\#channel\#/$channel/;
 
     my $xpath = $self->ec->createJobStep({
@@ -282,12 +363,17 @@ sub scanFiles {
     for my $file (keys %$mapping) {
         my $dest = $mapping->{$file};
         if (-f $dest) {
-            print "Got file $dest\n";
+
         }
         else {
             die "The file $dest was not received\n";
         }
     }
+
+    unless(-d $grapeFolder) {
+        mkdir $grapeFolder;
+    }
+
     unless( -w $grapeFolder) {
         die "$grapeFolder is not writable. Please allow agent user to write to this directory."
     }
@@ -298,3 +384,4 @@ sub scanFiles {
 }
 
 1;
+
