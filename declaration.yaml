@@ -1,0 +1,58 @@
+pluginName: EC-Glassfish
+description: Integrates with Glassfish Application server
+# CreateConfiguration?
+procedures:
+  - name: Deploy
+    description: Deploy procedure
+    hasConfig: true
+
+    # This part of configuration will generate form.xml 1:1
+    # If this configuration changes, form.xml changes too
+    parameters:
+      - property: applicationPath
+        documentation: |
+          Path to the application, *required*
+        type: entry
+        required: true
+        label: Application Path
+      - property: dropdown
+        type: select
+        options:
+          - name: name
+            value: value
+        value: value
+        # Dynamic parameters??
+    outputParameters:
+      deployed: JSON representation of the deployed application
+    # Steps are not defined so we assume that this is one-step procedure with a single step named Deploy
+    shell: ec-groovy # shell can also be step-level property
+
+# These are libraries, pulled by request.
+# For example, http library, cli library, oauth (security algorithms library), template engine
+# This part of the configuration will pull the components from ... somewhere, maybe github
+# A component is like a "plugin for the plugin framework" - i.e. some kind of a library
+components:
+  - template-engine
+  - oauth
+  - cli
+
+bindings:
+  type: cli
+  auth:
+    parameters:
+      - username
+      - password
+  commands:
+    deploy:
+      parameters:
+        - name: appName
+          required: 1
+        - name: appPath
+          required: 0
+      command: "{{clipath}} deploy -app {appName} -appPath {appPath}"
+
+# pluginbuilder gen plugin|specs|help
+# pluginbuilder build
+# pluginbuilder deploy --server vivarium
+# pluginbuilder fetch httpclient - fetches the shared script from a shared repository
+# pluginbuilder watch
