@@ -32,6 +32,13 @@ documentation : Help text for the parameter
 <editor>
     <formElement>
         <type>entry</type>
+        <label>Configuration Name:</label>
+        <property>config</property>
+        <required>1</required>
+        <documentation>Configuration name</documentation>
+    </formElement>
+    <formElement>
+        <type>entry</type>
         <label>Parameter 1:</label>
         <property>param1</property>
         <required>1</required>

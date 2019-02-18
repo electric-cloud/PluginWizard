@@ -37,13 +37,13 @@ use strict;
 $|=1;
 
 
-$::gAdditionalArtifactVersion = "$[additionalArtifactVersion]";
+$::gAdditionalArtifactVersion = "";
 
 sub main() {
     my $ec = ElectricCommander->new();
     $ec->abortOnError(1);
 
-    retrieveGrapeDependency($ec, 'com.electriccloud:@PLUGIN_NAME@:1.0.0');
+    retrieveGrapeDependency($ec, 'com.electriccloud:@PLUGIN_KEY@-Grapes:1.0.0');
     if ($::gAdditionalArtifactVersion ne '') {
         my @versions = split(/\s*,\s*/, $::gAdditionalArtifactVersion);
         for my $version (@versions) {
