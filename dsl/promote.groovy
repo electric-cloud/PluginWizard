@@ -23,11 +23,12 @@ def stepsWithAttachedCredentials = [
 // ** end steps with attached credentials
 
 project pluginName, {
-
+	property 'ec_formXmlCompliant', value: 'true'
 	loadPluginProperties(pluginDir, pluginName)
 	loadProcedures(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)
 	//plugin configuration metadata
 	property 'ec_config', {
+		configLocation = 'ec_plugin_cfgs'
 		form = '$[' + "/projects/${pluginName}/procedures/CreateConfiguration/ec_parameterForm]"
 		property 'fields', {
 			property 'desc', {
