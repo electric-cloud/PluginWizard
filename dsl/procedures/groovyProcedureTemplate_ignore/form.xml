@@ -16,8 +16,8 @@
 
 -->
 <!--
-Each form element represents a procedure parameter. 
-The corresponding procedure parameters will be created automatically when 
+Each form element represents a procedure parameter.
+The corresponding procedure parameters will be created automatically when
 the plugin in installed and promoted.
 
 formElement nested elements:
@@ -32,10 +32,17 @@ documentation : Help text for the parameter
 <editor>
     <formElement>
         <type>entry</type>
+        <label>Configuration Name:</label>
+        <property>config</property>
+        <required>1</required>
+        <documentation>Configuration name</documentation>
+    </formElement>
+    <formElement>
+        <type>entry</type>
         <label>Parameter 1:</label>
         <property>param1</property>
         <required>1</required>
         <documentation>Sample parameter</documentation>
-    </formElement> 
+    </formElement>
 	<!--Add more parameters here-->
 </editor>
