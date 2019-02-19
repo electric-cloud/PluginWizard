@@ -38,4 +38,7 @@
      
 Your plugin procedure is now available for use!
 
+See https://github.com/electric-cloud/PluginWizard/wiki for details.
+
 [1]: https://github.com/electric-cloud/Patterns/tree/master/LightningTalks/PluginWizard
+
