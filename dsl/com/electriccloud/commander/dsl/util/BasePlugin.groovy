@@ -1,3 +1,4 @@
+// Version: Thu Oct 25 16:10:18 2018
 package com.electriccloud.commander.dsl.util
 
 import groovy.io.FileType
@@ -112,19 +113,26 @@ abstract class BasePlugin extends DslDelegatingScript {
 		// Recursively navigate each file or sub-directory in the properties directory
 		//Create a property corresponding to a file,
 		// or create a property sheet for a sub-directory before navigating into it
-		loadNestedProperties("/projects/$pluginName", new File(pluginDir, 'dsl/properties'))
+		loadNestedProperties("/projects/$pluginName", new File(pluginDir, 'dsl/properties'), pluginName)
 	}
 
-	def loadNestedProperties(String propRoot, File propsDir) {
+	def loadNestedProperties(String propRoot, File propsDir, String pluginName) {
 
 		propsDir.eachFile { dir ->
 			int extension = dir.name.lastIndexOf('.')
 			int endIndex = extension > -1 ? extension : dir.name.length()
 			String propName = dir.name.substring(0, endIndex)
-			String propPath = "${propRoot}/${propName}"
+			def keepExtensions = getProperty("/projects/$pluginName/ec_keepFilesExtensions", suppressNoSuchPropertyException: true, expand: false)
+			String propPath
+			if (keepExtensions) {
+				propPath = "${propRoot}/${dir.name}"
+			}
+			else {
+				propPath = "${propRoot}/${propName}"
+			}
 			if (dir.directory) {
 				property propName, {
-					loadNestedProperties(propPath, dir)
+					loadNestedProperties(propPath, dir, pluginName)
 				}
 			} else {
 				def exists = getProperty(propPath, suppressNoSuchPropertyException: true, expand: false)
@@ -196,9 +204,9 @@ abstract class BasePlugin extends DslDelegatingScript {
 	}
 
 	def nullIfEmpty(def value) {
-		value == '' ? null : value 
+		value == '' ? null : value
 	}
-	
+
 	def buildFormalParametersFromFormXml(def proc, File formXml) {
 
 		def formElements = new XmlSlurper().parseText(formXml.text)
