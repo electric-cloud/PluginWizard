@@ -23,7 +23,7 @@ def stepsWithAttachedCredentials = [
 // ** end steps with attached credentials
 
 project pluginName, {
-	property 'ec_keepFilesExtensions', value: 'true' // Needed to keep files extensions in the properties names (by default extensions are removed)
+	property 'ec_keepFilesExtensions', value: 'false' // Needed to keep files extensions in the properties names (by default extensions are removed)
 	property 'ec_formXmlCompliant', value: 'true'
 	loadPluginProperties(pluginDir, pluginName)
 	loadProcedures(pluginDir, pluginKey, pluginName, stepsWithAttachedCredentials)

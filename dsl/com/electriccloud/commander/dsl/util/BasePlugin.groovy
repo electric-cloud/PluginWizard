@@ -124,7 +124,7 @@ abstract class BasePlugin extends DslDelegatingScript {
 			String propName = dir.name.substring(0, endIndex)
 			def keepExtensions = getProperty("/projects/$pluginName/ec_keepFilesExtensions", suppressNoSuchPropertyException: true, expand: false)
 			String propPath
-			if (keepExtensions) {
+			if (keepExtensions && !isFalse(keepExtensions?.value)) {
 				propPath = "${propRoot}/${dir.name}"
 			}
 			else {
@@ -300,6 +300,10 @@ abstract class BasePlugin extends DslDelegatingScript {
            clone path: "/plugins/$otherPluginName/project/$propertyName", cloneName: "/plugins/$pluginName/project/$propertyName"
            println "Cloned /plugins/$otherPluginName/project/$propertyName, /plugins/$pluginName/project/$propertyName"
  	   }
+    }
+
+    def isFalse(value) {
+    	return !value || value == "false" || value == "0"
     }
 
 
