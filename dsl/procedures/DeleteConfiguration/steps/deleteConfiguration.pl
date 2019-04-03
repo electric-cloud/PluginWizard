@@ -15,26 +15,9 @@
 #
 
 use ElectricCommander;
-use constant {
-               SUCCESS => 0,
-               ERROR   => 1,
-             };
-             
+
 my $ec = new ElectricCommander();
-$ec->abortOnError(0);
-
-# check to see if a config with this name already exists before we do anything else
-my $xpath    = $ec->getProperty("/myProject/ec_plugin_cfgs/$[config]");
-my $property = $xpath->findvalue("//response/property/propertyName");
-
-if (! defined $property or "$property" eq "") {
-    my $msg = "Configuration $[config] doesn't exist.";
-    print $msg;
-    $ec->setProperty("/myCall/summary", $msg);
-    $ec->setProperty('/myJobStep/outcome', 'error');
-    exit ERROR;
-}
 
 $ec->deleteProperty("/myProject/ec_plugin_cfgs/$[config]");
 $ec->deleteCredential("$[/myProject/projectName]", "$[config]");
-exit SUCCESS;
+exit 0;
